@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"omada_exporter_go/internal/Omada/Model/AccessPoint"
+	"omada_exporter_go/internal/Omada/Model/Client"
 	"omada_exporter_go/internal/Omada/Model/Devices"
 	"omada_exporter_go/internal/Omada/Model/Gateway"
 	"omada_exporter_go/internal/Omada/Model/Interface"
@@ -61,10 +62,20 @@ func CollectMetrics() error {
 	} else {
 		fmt.Println("failed to get access points: %w", err)
 	}
+
 	omada_scrape_duration.Set(time.Since(start).Seconds())
 
 	ExposeDeviceMetrics(omadaDevices)
 	ExposePortMetrics(omadaDevices)
 	ExposeRadioMetrics(omadaDevices)
+
+	// Fetch and expose per-client metrics
+	clients, err := Client.Get()
+	if err != nil {
+		fmt.Println("failed to get clients: %w", err)
+	} else {
+		ExposeClientMetrics(*clients)
+	}
+
 	return err
 }

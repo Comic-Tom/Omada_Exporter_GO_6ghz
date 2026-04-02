@@ -61,8 +61,10 @@ func mergeConfigAndTraffic(freq Enum.RadioFrequency, config apRadioConfig, traff
 type rawAccessPointRadio struct {
 	Traffic24GHz apRadioTraffic `json:"radioTraffic2g"`
 	Traffic50GHz apRadioTraffic `json:"radioTraffic5g"`
+	Traffic60GHz apRadioTraffic `json:"radioTraffic6g"`
 	Config24GHz  apRadioConfig  `json:"wp2g"`
 	Config50GHz  apRadioConfig  `json:"wp5g"`
+	Config60GHz  apRadioConfig  `json:"wp6g"`            
 }
 
 func (apr rawAccessPointRadio) ConvertToAccessPointRadio() []AccessPointRadio {
@@ -70,11 +72,20 @@ func (apr rawAccessPointRadio) ConvertToAccessPointRadio() []AccessPointRadio {
 	apr.Config24GHz.Frequency = Enum.RadioFrequency_2_4_Ghz
 	apr.Traffic50GHz.Frequency = Enum.RadioFrequency_5_0_Ghz
 	apr.Config50GHz.Frequency = Enum.RadioFrequency_5_0_Ghz
+	apr.Traffic60GHz.Frequency = Enum.RadioFrequency_6_0_Ghz 
+	apr.Config60GHz.Frequency = Enum.RadioFrequency_6_0_Ghz  
 
-	return []AccessPointRadio{
+	radios := []AccessPointRadio{
 		mergeConfigAndTraffic(Enum.RadioFrequency_2_4_Ghz, apr.Config24GHz, apr.Traffic24GHz),
 		mergeConfigAndTraffic(Enum.RadioFrequency_5_0_Ghz, apr.Config50GHz, apr.Traffic50GHz),
 	}
+
+	// Only add 6GHz if the AP actually has it (MaxTxRate will be 0 if not present)
+	if apr.Config60GHz.MaxTxRate > 0 {
+		radios = append(radios, mergeConfigAndTraffic(Enum.RadioFrequency_6_0_Ghz, apr.Config60GHz, apr.Traffic60GHz))
+	}
+
+	return radios
 }
 
 type AccessPointRadio struct {

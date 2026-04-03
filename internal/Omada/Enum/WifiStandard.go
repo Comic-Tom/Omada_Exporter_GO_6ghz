@@ -1,44 +1,47 @@
 package Enum
 
 // WifiMode maps Omada's wifiMode integer to a human-readable WiFi standard string.
-// Values derived from empirical observation of Omada API behavior with WiFi 6/7 devices.
+// Values sourced from Omada OpenAPI documentation and empirical observation.
 type WifiMode int
 
 const (
-	WifiMode_A   WifiMode = 0 // 802.11a
-	WifiMode_B   WifiMode = 1 // 802.11b
-	WifiMode_G   WifiMode = 2 // 802.11g
-	WifiMode_NA  WifiMode = 3 // 802.11n (5GHz)
-	WifiMode_NG  WifiMode = 4 // 802.11n (2.4GHz)
-	WifiMode_AC  WifiMode = 5 // 802.11ac (WiFi 5)
-	WifiMode_AXA WifiMode = 6 // 802.11ax (WiFi 6 5/6GHz)
-	WifiMode_AXG WifiMode = 7 // 802.11ax (WiFi 6 2.4GHz)
-	WifiMode_BEG WifiMode = 8 // 802.11be (WiFi 7 2.4GHz)
-	WifiMode_BEA WifiMode = 9 // 802.11be (WiFi 7 5/6GHz)
+	WifiMode_BG       WifiMode = 0  // 802.11b/g
+	WifiMode_BGN      WifiMode = 1  // 802.11b/g/n
+	WifiMode_A        WifiMode = 2  // 802.11a
+	WifiMode_AN       WifiMode = 3  // 802.11a/n
+	WifiMode_ANAC     WifiMode = 4  // 802.11a/n/ac (WiFi 5)
+	WifiMode_ANACAX   WifiMode = 5  // 802.11a/n/ac/ax (WiFi 6, 5GHz)
+	WifiMode_BGNAX    WifiMode = 6  // 802.11b/g/n/ax (WiFi 6, 2.4GHz)
+	WifiMode_BGNAXBE  WifiMode = 7  // 802.11b/g/n/ax/be (WiFi 7, 2.4GHz)
+	WifiMode_ANACAXBE WifiMode = 8  // 802.11a/n/ac/ax/be (WiFi 7, 5GHz)
+	WifiMode_ANACAX6  WifiMode = 9  // 802.11ax (WiFi 6E, 6GHz)
+	WifiMode_AXBE6    WifiMode = 10 // 802.11ax/be (WiFi 7, 6GHz)
 )
 
 func (wm WifiMode) String() string {
 	switch wm {
+	case WifiMode_BG:
+		return "802.11b/g"
+	case WifiMode_BGN:
+		return "802.11b/g/n"
 	case WifiMode_A:
 		return "802.11a"
-	case WifiMode_B:
-		return "802.11b"
-	case WifiMode_G:
-		return "802.11g"
-	case WifiMode_NA:
-		return "802.11n (5GHz)"
-	case WifiMode_NG:
-		return "802.11n (2.4GHz)"
-	case WifiMode_AC:
+	case WifiMode_AN:
+		return "802.11a/n"
+	case WifiMode_ANAC:
 		return "WiFi 5 (802.11ac)"
-	case WifiMode_AXA:
-		return "WiFi 6 (802.11ax 5/6GHz)"
-	case WifiMode_AXG:
+	case WifiMode_ANACAX:
+		return "WiFi 6 (802.11ax 5GHz)"
+	case WifiMode_BGNAX:
 		return "WiFi 6 (802.11ax 2.4GHz)"
-	case WifiMode_BEG:
+	case WifiMode_BGNAXBE:
 		return "WiFi 7 (802.11be 2.4GHz)"
-	case WifiMode_BEA:
-		return "WiFi 7 (802.11be 5/6GHz)"
+	case WifiMode_ANACAXBE:
+		return "WiFi 7 (802.11be 5GHz)"
+	case WifiMode_ANACAX6:
+		return "WiFi 6E (802.11ax 6GHz)"
+	case WifiMode_AXBE6:
+		return "WiFi 7 (802.11be 6GHz)"
 	default:
 		return "unknown"
 	}

@@ -5,17 +5,16 @@ package Enum
 type WifiMode int
 
 const (
-	WifiMode_BG       WifiMode = 0  // 802.11b/g
-	WifiMode_BGN      WifiMode = 1  // 802.11b/g/n
-	WifiMode_A        WifiMode = 2  // 802.11a
-	WifiMode_AN       WifiMode = 3  // 802.11a/n
-	WifiMode_ANAC     WifiMode = 4  // 802.11a/n/ac (WiFi 5)
-	WifiMode_ANACAX   WifiMode = 5  // 802.11a/n/ac/ax (WiFi 6, 5GHz)
-	WifiMode_BGNAX    WifiMode = 6  // 802.11b/g/n/ax (WiFi 6, 2.4GHz)
-	WifiMode_BGNAXBE  WifiMode = 7  // 802.11b/g/n/ax/be (WiFi 7, 2.4GHz)
-	WifiMode_ANACAXBE WifiMode = 8  // 802.11a/n/ac/ax/be (WiFi 7, 5GHz)
-	WifiMode_ANACAX6  WifiMode = 9  // 802.11ax (WiFi 6E, 6GHz)
-	WifiMode_AXBE6    WifiMode = 10 // 802.11ax/be (WiFi 7, 6GHz)
+    WifiMode_BG       WifiMode = 0  // 802.11b/g
+    WifiMode_BGN      WifiMode = 1  // 802.11b/g/n
+    WifiMode_A        WifiMode = 2  // 802.11a
+    WifiMode_AN       WifiMode = 3  // 802.11a/n
+    WifiMode_ANAC     WifiMode = 4  // 802.11a/n/ac (WiFi 5)
+    WifiMode_ANACAX   WifiMode = 5  // 802.11a/n/ac/ax (WiFi 6)
+    WifiMode_BGNAX    WifiMode = 6  // 802.11b/g/n/ax (WiFi 6)
+    WifiMode_BGNAXBE  WifiMode = 7  // 802.11b/g/n/ax/be (WiFi 7, 2.4GHz)
+    WifiMode_ANACAXBE WifiMode = 8  // 802.11a/n/ac/ax/be (WiFi 7, 5GHz/6GHz)
+    WifiMode_ANACAX6  WifiMode = 9  // 802.11ax (WiFi 6E, 6GHz)
 )
 
 func (wm WifiMode) String() string {

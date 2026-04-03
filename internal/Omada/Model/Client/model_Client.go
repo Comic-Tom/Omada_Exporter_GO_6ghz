@@ -20,6 +20,7 @@ type MultiLinkEntry struct {
 }
 
 // RadioBand returns a human-readable band for a MultiLinkEntry.
+// MLO radioId mapping: 0=2.4GHz, 1=5GHz, 2=5GHz-2 (some APs), 3=6GHz
 func (m MultiLinkEntry) RadioBand() string {
 	switch m.RadioID {
 	case 0:
@@ -27,9 +28,9 @@ func (m MultiLinkEntry) RadioBand() string {
 	case 1:
 		return "5.0 GHz"
 	case 2:
-		return "5.0 GHz2" // Omada uses 2 for the second 5GHz radio on Tri-band APs
+		return "5.0 GHz (2)"
 	case 3:
-		return "6.0 GHz" // Omada uses 3 for 6GHz
+		return "6.0 GHz"
 	default:
 		return "unknown"
 	}
@@ -88,6 +89,7 @@ func (c Client) DisplayName() string {
 }
 
 // RadioBand returns a human-readable band string for a single-link wireless client.
+// radioId mapping: 0=2.4GHz, 1=5GHz, 2=5GHz-2 (some APs), 3=6GHz
 func (c Client) RadioBand() string {
 	switch c.RadioID {
 	case 0:
@@ -95,7 +97,7 @@ func (c Client) RadioBand() string {
 	case 1:
 		return "5.0 GHz"
 	case 2:
-		return "5.0 GHz"
+		return "5.0 GHz (2)"
 	case 3:
 		return "6.0 GHz"
 	default:

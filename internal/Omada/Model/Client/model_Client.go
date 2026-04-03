@@ -27,7 +27,9 @@ func (m MultiLinkEntry) RadioBand() string {
 	case 1:
 		return "5.0 GHz"
 	case 2:
-		return "6.0 GHz"
+		return "5.0 GHz2" // Omada uses 2 for the second 5GHz radio on Tri-band APs
+	case 3:
+		return "6.0 GHz" // Omada uses 3 for 6GHz
 	default:
 		return "unknown"
 	}
@@ -93,6 +95,8 @@ func (c Client) RadioBand() string {
 	case 1:
 		return "5.0 GHz"
 	case 2:
+		return "5.0 GHz"
+	case 3:
 		return "6.0 GHz"
 	default:
 		return "unknown"

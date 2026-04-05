@@ -31,6 +31,8 @@ func RadioBandFromID(radioID int) string {
 		return "2.4 GHz"
 	case 1:
 		return "5.0 GHz"
+	case 2:
+		return "5.0 GHz/2"
 	case 3:
 		return "6.0 GHz"
 	default:

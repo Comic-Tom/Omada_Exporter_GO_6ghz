@@ -70,7 +70,7 @@ func (wm WifiMode) StringWithBand(radioID int, isWifi7 bool) string {
 	}
 
 	// WiFi 6 ax variants — disambiguate by band
-	if wm == WifiMode_AX || wm == WifiMode_BGNAX || wm == WifiMode_ANACAX {
+	if wm == WifiMode_BGNAX || wm == WifiMode_ANACAX {
 		switch radioID {
 		case 0:
 			return "WiFi 6 (802.11ax 2.4GHz)"

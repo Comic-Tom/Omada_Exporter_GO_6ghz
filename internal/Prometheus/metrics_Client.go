@@ -184,7 +184,8 @@ func ExposeClientMetrics(clients []Client.Client) {
 					label_clientApName: c.ApName,
 					"band":             link.RadioBand(),
 					// Use band-aware standard string for accurate labelling
-					"wifiStandard": link.WifiMode.StringWithBand(link.RadioID),
+					// We pass c.IsMLO() or a similar check to satisfy the second boolean argument
+"wifiStandard": link.WifiMode.StringWithBand(link.RadioID, c.IsMLO()),
 				}
 				client_mlo_link_rx_rate_bps.With(mloLabels).Set(link.RxRate * 1000)
 				client_mlo_link_tx_rate_bps.With(mloLabels).Set(link.TxRate * 1000)

@@ -1,83 +1,90 @@
 package Enum
 
 // WifiMode maps Omada's wifiMode integer to a human-readable WiFi standard string.
+//
+// Values from official Omada OpenAPI docs, verified against real device data:
+//   0: 11a   → 802.11a           (5GHz legacy)
+//   1: 11b   → 802.11b           (2.4GHz legacy)
+//   2: 11g   → 802.11g           (2.4GHz)
+//   3: 11na  → 802.11a/n         (5GHz WiFi 4)
+//   4: 11ng  → 802.11b/g/n       (2.4GHz WiFi 4)
+//   5: 11ac  → 802.11a/n/ac      (WiFi 5, 5GHz)
+//   6: 11axa → 802.11ax          (WiFi 6, 5GHz ax)   ← NOT 6E; confirmed via radioId=1 in real data
+//   7: 11axg → 802.11ax          (WiFi 6, 2.4GHz ax)
+//   8: 11beg → 802.11be          (WiFi 7, 2.4GHz be) ← observed: radioId=0 in real multiLink data
+//   9: 11bea → 802.11be          (WiFi 7, 5GHz/6GHz be) ← observed: radioId=1 or radioId=3 in real data
+//
+// Note: wifiMode 9 covers both 5GHz and 6GHz WiFi 7 links. Use radioId to distinguish:
+//   radioId=1 → 5GHz, radioId=3 → 6GHz. The String() method returns a generic label;
+//   use RadioBandFromID() alongside wifiMode for full band detail.
+//
+// The official docs define multiLink wifiMode as 0-7, but values 8 and 9 are
+// observed in practice for 802.11be (WiFi 7) links.
 type WifiMode int
 
 const (
-	WifiMode_BG       WifiMode = 0 // 802.11b/g
-	WifiMode_BGN      WifiMode = 1 // 802.11b/g/n
-	WifiMode_A        WifiMode = 2 // 802.11a
-	WifiMode_AN       WifiMode = 3 // 802.11a/n
-	WifiMode_ANAC     WifiMode = 4 // 802.11a/n/ac (WiFi 5)
-	WifiMode_ANACAX   WifiMode = 5 // 802.11a/n/ac/ax (WiFi 6)
-	WifiMode_BGNAX    WifiMode = 6 // 802.11b/g/n/ax (WiFi 6)
-	WifiMode_BGNAXBE  WifiMode = 7 // 802.11b/g/n/ax/be (WiFi 7 2.4GHz)
-	WifiMode_ANACAXBE WifiMode = 8 // 802.11a/n/ac/ax/be (WiFi 7 5GHz)
-	WifiMode_AXACAXBE WifiMode = 9 // 802.11ax — band determines 6/6E/7 (I dont think the ai's right i think this is also wifi 7
+	WifiMode_11a   WifiMode = 0 // 802.11a (5GHz legacy)
+	WifiMode_11b   WifiMode = 1 // 802.11b (2.4GHz legacy)
+	WifiMode_11g   WifiMode = 2 // 802.11g (2.4GHz)
+	WifiMode_11na  WifiMode = 3 // 802.11a/n (5GHz WiFi 4)
+	WifiMode_11ng  WifiMode = 4 // 802.11b/g/n (2.4GHz WiFi 4)
+	WifiMode_11ac  WifiMode = 5 // 802.11a/n/ac (WiFi 5, 5GHz)
+	WifiMode_11axa WifiMode = 6 // 802.11ax (WiFi 6, 5GHz) — NOT 6E
+	WifiMode_11axg WifiMode = 7 // 802.11ax (WiFi 6, 2.4GHz)
+	WifiMode_11beg WifiMode = 8 // 802.11be (WiFi 7, 2.4GHz)
+	WifiMode_11bea WifiMode = 9 // 802.11be (WiFi 7, 5GHz or 6GHz — see radioId)
 )
 
 func (wm WifiMode) String() string {
 	switch wm {
-	case WifiMode_BG:
-		return "802.11b/g"
-	case WifiMode_BGN:
-		return "802.11b/g/n"
-	case WifiMode_A:
+	case WifiMode_11a:
 		return "802.11a"
-	case WifiMode_AN:
+	case WifiMode_11b:
+		return "802.11b"
+	case WifiMode_11g:
+		return "802.11g"
+	case WifiMode_11na:
 		return "802.11a/n"
-	case WifiMode_ANAC:
+	case WifiMode_11ng:
+		return "802.11b/g/n (WiFi 4)"
+	case WifiMode_11ac:
 		return "WiFi 5 (802.11ac)"
-	case WifiMode_ANACAX:
-		return "WiFi 6 (802.11ax)"
-	case WifiMode_BGNAX:
-		return "WiFi 6 (802.11ax)"
-	case WifiMode_BGNAXBE:
+	case WifiMode_11axa:
+		return "WiFi 6 (802.11ax 5GHz)"
+	case WifiMode_11axg:
+		return "WiFi 6 (802.11ax 2.4GHz)"
+	case WifiMode_11beg:
 		return "WiFi 7 (802.11be 2.4GHz)"
-	case WifiMode_ANACAXBE:
-		return "WiFi 7 (802.11be 5GHz)"
-	case WifiMode_AXACAXBE:
-		return "WiFi 7 (802.11be 6GHz)"
+	case WifiMode_11bea:
+		return "WiFi 7 (802.11be)"
 	default:
 		return "unknown"
 	}
 }
 
-// StringWithBand returns the most accurate WiFi standard label given the radioId and
-// whether the client has been identified as WiFi 7 (via BE wifiMode on any link).
+// StringWithBand returns a band-aware WiFi standard label using radioId to resolve
+// ambiguous wifiMode values:
 //
-// radioId mapping: 0=2.4GHz, 1=5GHz, 3=6GHz
+//   - wifiMode 6 (11axa) on radioId 3 (6GHz) → WiFi 6E; otherwise WiFi 6 5GHz.
+//     Confirmed via SilverDragon: wifiMode=6, radioId=3, UI band="6 GHz (11ax)".
+//   - wifiMode 7 (11axg) on radioId 3 (6GHz) → WiFi 6E (defensive; not yet observed).
+//   - wifiMode 9 (11bea) on radioId 1/2 → WiFi 7 5GHz; radioId 3 → WiFi 7 6GHz.
 //
-// Key rules:
-//   - Any radioId=3 (6GHz): WiFi 6E unless IsWifi7 confirmed → WiFi 7
-//   - wifiMode=6 on radioId=3: Omada reports ax on 6GHz as mode 6 → still 6E/7 by band
-//   - wifiMode=7/8: confirmed WiFi 7 regardless of band
-func (wm WifiMode) StringWithBand(radioID int, isWifi7 bool) string {
-	// 6GHz band — label by generation, not wifiMode (Omada reuses mode values across bands)
-	if radioID == 3 {
-		if isWifi7 {
+// All other modes encode their band directly in the wifiMode value and fall through
+// to String().
+func (wm WifiMode) StringWithBand(radioID int) string {
+	switch wm {
+	case WifiMode_11axa, WifiMode_11axg:
+		if radioID == 3 {
+			return "WiFi 6E (802.11ax 6GHz)"
+		}
+	case WifiMode_11bea:
+		switch radioID {
+		case 1, 2:
+			return "WiFi 7 (802.11be 5GHz)"
+		case 3:
 			return "WiFi 7 (802.11be 6GHz)"
 		}
-		return "WiFi 6E (802.11ax 6GHz)"
 	}
-
-	// Confirmed WiFi 7 on other bands
-	if wm == WifiMode_BGNAXBE {
-		return "WiFi 7 (802.11be 2.4GHz)"
-	}
-	if wm == WifiMode_ANACAXBE {
-		return "WiFi 7 (802.11be 5GHz)"
-	}
-
-	// WiFi 6 ax variants — disambiguate by band
-	if wm == WifiMode_BGNAX || wm == WifiMode_ANACAX {
-		switch radioID {
-		case 0:
-			return "WiFi 6 (802.11ax 2.4GHz)"
-		case 1:
-			return "WiFi 6 (802.11ax 5GHz)"
-		}
-	}
-
 	return wm.String()
 }

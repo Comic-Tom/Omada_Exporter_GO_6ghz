@@ -7,15 +7,17 @@ import (
 
 const path_OpenApiClients = "/openapi/v1/{omadaID}/sites/{siteID}/clients"
 
-// MultiLinkEntry represents a single radio link in an MLO (Multi-Link Operation) connection.
+// MultiLinkEntry represents a single radio link in an MLO connection.
+// Note: the official multiLink wifiMode docs only define 0-7; values 8/9
+// are observed in practice for 802.11be (WiFi 7) links.
 type MultiLinkEntry struct {
-	RadioID     int           `json:"radioId"`     // 0=2.4GHz, 1=5GHz, 3=6GHz
+	RadioID     int           `json:"radioId"`
 	WifiMode    Enum.WifiMode `json:"wifiMode"`
 	Channel     int           `json:"channel"`
 	RxRate      float64       `json:"rxRate"`      // kbps
 	TxRate      float64       `json:"txRate"`      // kbps
 	SNR         int           `json:"snr"`
-	RSSI        int           `json:"rssi"`        // actual dBm
+	RSSI        int           `json:"rssi"`        // dBm
 	SignalLevel int           `json:"signalLevel"` // 0-100 percentage
 }
 
@@ -23,16 +25,23 @@ func (m MultiLinkEntry) RadioBand() string {
 	return RadioBandFromID(m.RadioID)
 }
 
-// RadioBandFromID maps Omada's radioId to a human-readable band string.
-// Omada uses 0=2.4GHz, 1=5GHz, 3=6GHz — there is no radioId 2.
+// WifiStandardString returns a band-aware WiFi standard label for this link.
+// For wifiMode 9 (WiFi 7), the band cannot be determined from wifiMode alone —
+// radioId is required to distinguish 5GHz (radioId=1/2) from 6GHz (radioId=3).
+func (m MultiLinkEntry) WifiStandardString() string {
+	return m.WifiMode.StringWithBand(m.RadioID)
+}
+
+// RadioBandFromID maps Omada's radioId to a band string.
+// 0=2.4GHz, 1=5GHz-1, 2=5GHz-2, 3=6GHz
 func RadioBandFromID(radioID int) string {
 	switch radioID {
 	case 0:
 		return "2.4 GHz"
 	case 1:
 		return "5.0 GHz"
-    case 2:
-		return "5.0 GHz/2"
+	case 2:
+		return "5.0 GHz-2"
 	case 3:
 		return "6.0 GHz"
 	default:
@@ -40,7 +49,7 @@ func RadioBandFromID(radioID int) string {
 	}
 }
 
-// Client represents a single network client connected to the Omada controller.
+// Client represents a single network client.
 type Client struct {
 	// Identity
 	MAC         string `json:"mac"`
@@ -55,20 +64,25 @@ type Client struct {
 	// Connection state
 	Active   bool    `json:"active"`
 	Wireless bool    `json:"wireless"`
-	Uptime   float64 `json:"uptime"`
+	Uptime   float64 `json:"uptime"` // seconds
 
-	// Traffic (session totals, in bytes)
-	TrafficDown float64 `json:"trafficDown"`
-	TrafficUp   float64 `json:"trafficUp"`
+	// Connection device type: "ap", "switch", "gateway"
+	ConnectDevType string `json:"connectDevType"`
 
-	// Wired-specific
+	// Traffic
+	TrafficDown float64 `json:"trafficDown"` // bytes
+	TrafficUp   float64 `json:"trafficUp"`   // bytes
+
+	// Wired — switch-connected
 	SwitchMAC  string `json:"switchMac"`
 	SwitchName string `json:"switchName"`
 	SwitchPort int    `json:"port"`
 
-	// Wireless top-level fields
-	// For non-MLO clients these are the primary source of truth.
-	// For MLO clients use MultiLink entries instead.
+	// Wired — gateway-connected
+	GatewayMAC  string `json:"gatewayMac"`
+	GatewayName string `json:"gatewayName"`
+
+	// Wireless top-level fields (use PrimaryLink() for signal/rate data)
 	SSID     string        `json:"ssid"`
 	ApMAC    string        `json:"apMac"`
 	ApName   string        `json:"apName"`
@@ -76,14 +90,14 @@ type Client struct {
 	WifiMode Enum.WifiMode `json:"wifiMode"`
 	RxRate   float64       `json:"rxRate"` // kbps
 	TxRate   float64       `json:"txRate"` // kbps
-	RSSI     int           `json:"rssi"`   // actual dBm — present on non-MLO clients
-	SNR      int           `json:"snr"`    // present on non-MLO clients
+	RSSI     int           `json:"rssi"`   // dBm
+	SNR      int           `json:"snr"`
 
-	// WiFi 7 MLO — one entry per active radio link
+	// MLO links
 	MultiLink []MultiLinkEntry `json:"multiLink"`
 }
 
-// DisplayName returns the best available human-readable name for the client.
+// DisplayName returns the best human-readable name.
 func (c Client) DisplayName() string {
 	if c.Name != "" {
 		return c.Name
@@ -94,25 +108,28 @@ func (c Client) DisplayName() string {
 	return c.MAC
 }
 
-// IsWifi7 returns true if any link (multiLink or top-level) uses 802.11be.
+// IsWifi7 returns true if any link uses 802.11be (wifiMode 8 or 9).
+// wifiMode 8 = WiFi 7 2.4GHz, wifiMode 9 = WiFi 7 5GHz/6GHz.
 func (c Client) IsWifi7() bool {
+	if c.WifiMode == Enum.WifiMode_11beg || c.WifiMode == Enum.WifiMode_11bea {
+		return true
+	}
 	for _, link := range c.MultiLink {
-		if link.WifiMode == Enum.WifiMode_BGNAXBE || link.WifiMode == Enum.WifiMode_ANACAXBE {
+		if link.WifiMode == Enum.WifiMode_11beg || link.WifiMode == Enum.WifiMode_11bea {
 			return true
 		}
 	}
-	return c.WifiMode == Enum.WifiMode_BGNAXBE || c.WifiMode == Enum.WifiMode_ANACAXBE
+	return false
 }
 
-// PrimaryLink returns the best available single link for signal/rate metrics.
+// PrimaryLink returns the best available link for signal/rate metrics.
 // For MLO clients, returns the link with the highest RSSI.
-// For non-MLO clients, synthesises a MultiLinkEntry from top-level fields.
+// For non-MLO wireless clients, synthesises from top-level fields.
 func (c Client) PrimaryLink() *MultiLinkEntry {
 	if len(c.MultiLink) == 0 {
 		if !c.Wireless {
 			return nil
 		}
-		// Non-MLO wireless client — synthesise from top-level fields
 		return &MultiLinkEntry{
 			RadioID:  c.RadioID,
 			WifiMode: c.WifiMode,
@@ -139,12 +156,13 @@ func (c Client) RadioBand() string {
 	return "unknown"
 }
 
-// WifiStandard returns the WiFi standard of the primary link, band-aware.
+// WifiStandard returns a band-aware WiFi standard label for the primary link.
+// For wifiMode 9 (WiFi 7 5GHz/6GHz), radioId is used to distinguish the band.
 func (c Client) WifiStandard() string {
 	if link := c.PrimaryLink(); link != nil {
-		return link.WifiMode.StringWithBand(link.RadioID, c.IsWifi7())
+		return link.WifiMode.StringWithBand(link.RadioID)
 	}
-	return c.WifiMode.String()
+	return c.WifiMode.StringWithBand(c.RadioID)
 }
 
 // SignalRSSI returns the RSSI (dBm) of the primary link.
@@ -163,7 +181,7 @@ func (c Client) SignalSNR() float64 {
 	return 0
 }
 
-// LinkRxRate returns the RX rate (kbps) of the primary link.
+// LinkRxRate returns the RX rate in kbps of the primary link.
 func (c Client) LinkRxRate() float64 {
 	if link := c.PrimaryLink(); link != nil {
 		return link.RxRate
@@ -171,7 +189,7 @@ func (c Client) LinkRxRate() float64 {
 	return c.RxRate
 }
 
-// LinkTxRate returns the TX rate (kbps) of the primary link.
+// LinkTxRate returns the TX rate in kbps of the primary link.
 func (c Client) LinkTxRate() float64 {
 	if link := c.PrimaryLink(); link != nil {
 		return link.TxRate
@@ -179,7 +197,7 @@ func (c Client) LinkTxRate() float64 {
 	return c.TxRate
 }
 
-// IsMLO returns true if this client is connected via MLO on multiple active links.
+// IsMLO returns true if this client has multiple active radio links.
 func (c Client) IsMLO() bool {
 	active := 0
 	for _, l := range c.MultiLink {
@@ -190,10 +208,38 @@ func (c Client) IsMLO() bool {
 	return active > 1
 }
 
-// SwitchPortID returns the switch port as a string label.
+// SwitchPortID returns the switch port as a string.
 func (c Client) SwitchPortID() string {
 	if c.SwitchPort == 0 {
 		return Enum.NotApplicable_String
 	}
 	return fmt.Sprintf("%d", c.SwitchPort)
+}
+
+// ConnectDevice returns the name of the device this client is connected to.
+func (c Client) ConnectDevice() string {
+	switch c.ConnectDevType {
+	case "switch":
+		return c.SwitchName
+	case "gateway":
+		return c.GatewayName
+	case "ap":
+		return c.ApName
+	default:
+		return ""
+	}
+}
+
+// ConnectDeviceMAC returns the MAC of the device this client is connected to.
+func (c Client) ConnectDeviceMAC() string {
+	switch c.ConnectDevType {
+	case "switch":
+		return c.SwitchMAC
+	case "gateway":
+		return c.GatewayMAC
+	case "ap":
+		return c.ApMAC
+	default:
+		return ""
+	}
 }

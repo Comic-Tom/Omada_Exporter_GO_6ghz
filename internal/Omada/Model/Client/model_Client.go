@@ -26,8 +26,7 @@ func (m MultiLinkEntry) RadioBand() string {
 }
 
 // WifiStandardString returns a band-aware WiFi standard label for this link.
-// For wifiMode 9 (WiFi 7), the band cannot be determined from wifiMode alone —
-// radioId is required to distinguish 5GHz (radioId=1/2) from 6GHz (radioId=3).
+// For wifiMode 9 (WiFi 7), radioId distinguishes 5GHz (radioId=1/2) from 6GHz (radioId=3).
 func (m MultiLinkEntry) WifiStandardString() string {
 	return m.WifiMode.StringWithBand(m.RadioID)
 }
@@ -69,9 +68,16 @@ type Client struct {
 	// Connection device type: "ap", "switch", "gateway"
 	ConnectDevType string `json:"connectDevType"`
 
-	// Traffic
+	// Session traffic totals
 	TrafficDown float64 `json:"trafficDown"` // bytes
 	TrafficUp   float64 `json:"trafficUp"`   // bytes
+
+	// Real-time activity rates (Byte/s).
+	// Activity is present on both wireless and wired clients (download direction).
+	// UploadActivity is present on wired clients only; wireless clients only report
+	// download activity at the top level (per-link activity exists in multiLink).
+	Activity       float64 `json:"activity"`       // real-time download Byte/s
+	UploadActivity float64 `json:"uploadActivity"` // real-time upload Byte/s (wired only)
 
 	// Wired — switch-connected
 	SwitchMAC  string `json:"switchMac"`
@@ -109,7 +115,6 @@ func (c Client) DisplayName() string {
 }
 
 // IsWifi7 returns true if any link uses 802.11be (wifiMode 8 or 9).
-// wifiMode 8 = WiFi 7 2.4GHz, wifiMode 9 = WiFi 7 5GHz/6GHz.
 func (c Client) IsWifi7() bool {
 	if c.WifiMode == Enum.WifiMode_11beg || c.WifiMode == Enum.WifiMode_11bea {
 		return true
@@ -157,7 +162,6 @@ func (c Client) RadioBand() string {
 }
 
 // WifiStandard returns a band-aware WiFi standard label for the primary link.
-// For wifiMode 9 (WiFi 7 5GHz/6GHz), radioId is used to distinguish the band.
 func (c Client) WifiStandard() string {
 	if link := c.PrimaryLink(); link != nil {
 		return link.WifiMode.StringWithBand(link.RadioID)
@@ -208,12 +212,22 @@ func (c Client) IsMLO() bool {
 	return active > 1
 }
 
-// SwitchPortID returns the switch port as a string.
+// SwitchPortID returns the switch port as a string, or NotApplicable_String if unset.
 func (c Client) SwitchPortID() string {
 	if c.SwitchPort == 0 {
 		return Enum.NotApplicable_String
 	}
 	return fmt.Sprintf("%d", c.SwitchPort)
+}
+
+// WiredPortSpeedKey returns the lookup key for PortSpeedMap.
+// Format: "switchMAC:portNumber" e.g. "40-AE-30-F6-8B-01:9".
+// Returns "" for any client not on a switch port (gateway-connected, wireless, port==0).
+func (c Client) WiredPortSpeedKey() string {
+	if c.ConnectDevType != "switch" || c.SwitchPort == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", c.SwitchMAC, c.SwitchPort)
 }
 
 // ConnectDevice returns the name of the device this client is connected to.
@@ -243,3 +257,13 @@ func (c Client) ConnectDeviceMAC() string {
 		return ""
 	}
 }
+
+// PortSpeedMap maps "switchMAC:portNumber" → negotiated link speed in bps.
+// Built by the scraper from switch port data before calling ExposeClientMetrics,
+// so wired switch clients can be annotated with their physical port link speed.
+//
+// Example: "40-AE-30-F6-8B-01:9" → 10_000_000_000 (10 GbE)
+//
+// The scraper should build this using the same port speed values that are exposed
+// via port_speed{deviceType="Switch", macAddress=..., portID=...}.
+type PortSpeedMap map[string]float64

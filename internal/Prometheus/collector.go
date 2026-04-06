@@ -69,12 +69,28 @@ func CollectMetrics() error {
 	ExposePortMetrics(omadaDevices)
 	ExposeRadioMetrics(omadaDevices)
 
+	// Build a port speed lookup from already-fetched switch data so that
+	// wired clients can be annotated with their physical link speed.
+	// Key format: "switchMAC:portNumber" — matches Client.WiredPortSpeedKey().
+	portSpeeds := Client.PortSpeedMap{}
+	if switches != nil {
+		for _, sw := range *switches {
+			for _, port := range sw.PortList {
+				speed := port.LinkSpeed.Int()
+				if speed > 0 {
+					key := fmt.Sprintf("%s:%d", sw.MacAddress, port.Port)
+					portSpeeds[key] = float64(speed)
+				}
+			}
+		}
+	}
+
 	// Fetch and expose per-client metrics
 	clients, err := Client.Get()
 	if err != nil {
 		fmt.Println("failed to get clients: %w", err)
 	} else {
-		ExposeClientMetrics(*clients)
+		ExposeClientMetrics(*clients, portSpeeds)
 	}
 
 	return err
